@@ -82,7 +82,7 @@ export const createChatSession = (params: {
   sourceKey: string;
   characterId: string;
   title: string;
-  pdfText: string;
+  pdfText?: string;
 }): ChatSession => {
   const now = Date.now();
 
@@ -92,7 +92,15 @@ export const createChatSession = (params: {
     sourceKey: params.sourceKey,
     title: params.title,
     pdfText: params.pdfText,
-    messages: [], // Start empty; greeting is generated on first exchange
+    messages: [],
+    studentModel: {
+      conceptMastery: {},
+      weakAreas: [],
+      learningStyle: '',
+      commonMistakes: [],
+      recentDiagnoses: [],
+      updatedAt: 0,
+    },
     createdAt: now,
     updatedAt: now,
   };

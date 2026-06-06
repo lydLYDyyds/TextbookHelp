@@ -32,6 +32,7 @@ export enum AppState {
 
 const App: React.FC = () => {
   const [currentState, setCurrentState] = useState<AppState>(AppState.TITLE);
+  const [skipPDF, setSkipPDF] = useState(false);
   const defaultSettings = useMemo<GameSettings>(() => ({
     detailLevel: 'detailed',
     personality: 'gentle',
@@ -93,7 +94,8 @@ const App: React.FC = () => {
       <div className="relative z-10 w-full h-full">
         {currentState === AppState.TITLE && (
           <TitleScreen
-            onStart={() => setCurrentState(AppState.UPLOAD)}
+            onStart={() => { setSkipPDF(false); setCurrentState(AppState.UPLOAD); }}
+            onDirectStart={() => { setSkipPDF(true); setCurrentState(AppState.UPLOAD); }}
             onResume={handleResume}
             hasSavedSession={hasSavedSession}
             onResources={() => setCurrentState(AppState.RESOURCES)}
@@ -146,6 +148,7 @@ const App: React.FC = () => {
             onSessionCreated={handleSessionCreated}
             onBack={handleBackToTitle}
             settings={settings}
+            skipPDF={skipPDF}
           />
         )}
 
