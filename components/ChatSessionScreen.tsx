@@ -6,7 +6,7 @@
  * PDF is optional — the character can teach from their own knowledge.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChatMessage, ChatSession, GameSettings } from '../types';
+import { ChatMessage, ChatSession, GameSettings, EMPTY_STUDENT_MODEL } from '../types';
 import { LatexText } from './LatexText';
 import { sendChatMessage, updateStudentModel } from '../services/aiService';
 import { upsertChatSession } from '../services/localStorageService';
@@ -79,9 +79,9 @@ export const ChatSessionScreen: React.FC<Props> = ({ session, settings, onExit, 
       };
 
       // Update student model from diagnosis
-      let updatedModel = snapshot.studentModel;
+      let updatedModel = snapshot.studentModel ?? EMPTY_STUDENT_MODEL;
       if (diagnosis) {
-        updatedModel = updateStudentModel(snapshot.studentModel, diagnosis);
+        updatedModel = updateStudentModel(updatedModel, diagnosis);
       }
 
       const updatedSession: ChatSession = {

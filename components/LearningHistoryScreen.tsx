@@ -37,7 +37,9 @@ export const LearningHistoryScreen: React.FC<Props> = ({ onResume, onBack, setti
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    setSessions(loadChatSessions());
+    const loaded = loadChatSessions();
+    // Fix: ensure every session has a studentModel (old sessions may not)
+    setSessions(loaded);
   }, []);
 
   const handleDelete = (id: string) => {
@@ -109,7 +111,7 @@ export const LearningHistoryScreen: React.FC<Props> = ({ onResume, onBack, setti
         <div className="space-y-4">
           {sessions.map(session => {
             const char = getCharacterById(session.characterId, settings.customCharacters);
-            const model = session.studentModel;
+            const model = session.studentModel ?? { conceptMastery: {}, weakAreas: [], learningStyle: '', commonMistakes: [], recentDiagnoses: [], updatedAt: 0 };
             const concepts = Object.entries(model.conceptMastery ?? {})
               .sort(([, a], [, b]) => b - a)
               .slice(0, 6);

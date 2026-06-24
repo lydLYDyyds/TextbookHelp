@@ -76,7 +76,7 @@ export interface ChatSession {
   title: string;
   pdfText?: string;          // extracted PDF content (optional — can learn without PDF)
   messages: ChatMessage[];
-  studentModel: StudentModel;
+  studentModel?: StudentModel;
   createdAt: number;
   updatedAt: number;
 }
