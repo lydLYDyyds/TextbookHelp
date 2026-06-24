@@ -109,9 +109,9 @@ export const ChatSessionScreen: React.FC<Props> = ({ session, settings, onExit, 
 
   const characterColor = character?.color ?? 'pink';
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-500', emerald: 'bg-emerald-500', purple: 'bg-purple-500',
-    pink: 'bg-pink-500', amber: 'bg-amber-500', orange: 'bg-orange-500',
-    rose: 'bg-rose-500', indigo: 'bg-indigo-500',
+    sky: 'bg-sky-500', rose: 'bg-rose-500', violet: 'bg-violet-500',
+    pink: 'bg-pink-500', purple: 'bg-purple-500', amber: 'bg-amber-500',
+    indigo: 'bg-indigo-500',
   };
   const avatarBg = colorMap[characterColor] ?? 'bg-pink-500';
 

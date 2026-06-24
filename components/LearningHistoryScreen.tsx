@@ -123,9 +123,9 @@ export const LearningHistoryScreen: React.FC<Props> = ({ onResume, onBack, setti
               'bg-red-400';
 
             const colorMap: Record<string, string> = {
-              blue: 'border-l-blue-400', emerald: 'border-l-emerald-400',
+              sky: 'border-l-sky-400', rose: 'border-l-rose-400',
+              violet: 'border-l-violet-400', pink: 'border-l-pink-400',
               purple: 'border-l-purple-400', amber: 'border-l-amber-400',
-              orange: 'border-l-orange-400', rose: 'border-l-rose-400',
               indigo: 'border-l-indigo-400',
             };
             const borderColor = colorMap[char?.color ?? 'pink'] ?? 'border-l-pink-400';

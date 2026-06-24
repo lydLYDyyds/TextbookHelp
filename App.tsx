@@ -42,7 +42,7 @@ const App: React.FC = () => {
     aiProvider: 'gemini',
     uiLanguage: 'zh',
     dialogueLanguage: 'zh',
-    activeCharacterId: 'prof-lin',
+    activeCharacterId: 'yuki-kuudere', // default 雪乃
   }), []);
   const [settings, setSettings] = useState<GameSettings>(() => loadSettings(defaultSettings));
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);

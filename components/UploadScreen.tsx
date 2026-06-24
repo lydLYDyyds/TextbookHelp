@@ -26,7 +26,7 @@ export const UploadScreen: React.FC<Props> = ({ onSessionCreated, onBack, settin
   const [error, setError] = useState<string | null>(null);
   const [loadingText, setLoadingText] = useState('');
 
-  const activeCharId = settings.activeCharacterId ?? 'prof-lin';
+  const activeCharId = settings.activeCharacterId ?? 'yuki-kuudere';
   const character = getBuiltinCharacter(activeCharId);
 
   // Start without PDF
