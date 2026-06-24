@@ -1,23 +1,13 @@
 /**
- * aiService.ts — AI provider layer
+ * aiService.ts — AI provider layer (v2 diagnostic engine)
  *
- * Handles communication with Gemini and DeepSeek backends through
- * the Vite dev-server proxies at /api/gemini/chat and /api/deepseek/chat.
- *
- * Primary entry points:
- *   createChatSession()  — PDF → ChatSession (extracts text + optional outline)
- *   sendChatMessage()    — sends user message + history → character reply
- *
- * @deprecated Legacy:
- *   analyzeTextbook(), evaluateStudentAnswer() — old script-generation flow
+ * Each user turn produces:
+ *   { diagnosis: DiagnosisEntry | null, response: string }
+ * Diagnosis is extracted from <diagnosis> XML block, response from <response>.
+ * Student model is updated locally after each turn.
  */
-import { Character, ChatSession, GameSettings } from '../types';
-import {
-  buildCharacterSystemPrompt,
-  buildSubjectOutlinePrompt,
-  subjectOutlineSchema,
-} from './prompts';
-import { parseJsonResponse } from './jsonParser';
+import { Character, ChatSession, DiagnosisEntry, GameSettings, StudentModel } from '../types';
+import { buildCharacterSystemPrompt } from './prompts';
 
 // ============================================================
 // HTTP helpers
@@ -36,6 +26,116 @@ const fetchWithRetry = async (url: string, options: RequestInit, retries = 2): P
   }
   throw new Error('Unreachable');
 };
+
+// ============================================================
+// Response parsing
+// ============================================================
+
+export function parseAIResponse(raw: string): { diagnosis: DiagnosisEntry | null; response: string } {
+  // Strip markdown code fences if present
+  let cleaned = raw
+    .replace(/^```[a-z]*\s*\n?/i, '')
+    .replace(/\n?\s*```$/i, '')
+    .trim();
+
+  const diagMatch = cleaned.match(/<diagnosis>\s*([\s\S]*?)\s*<\/diagnosis>/i);
+  const respMatch = cleaned.match(/<response>\s*([\s\S]*?)\s*<\/response>/i);
+
+  let diagnosis: DiagnosisEntry | null = null;
+  if (diagMatch?.[1]) {
+    const block = diagMatch[1].trim();
+    const understanding = (block.match(/understanding:\s*(solid|partial|confused|guessing)/i)?.[1]?.toLowerCase() ?? 'partial') as DiagnosisEntry['understanding'];
+    const gap = block.match(/gap:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const action = (block.match(/action:\s*(deepen|re_explain|advance|test)/i)?.[1]?.toLowerCase() ?? 'advance') as DiagnosisEntry['action'];
+    const conceptInvolved = block.match(/concept:\s*(.+)/i)?.[1]?.trim() ?? '';
+
+    diagnosis = {
+      timestamp: Date.now(),
+      understanding,
+      gap,
+      action,
+      conceptInvolved,
+    };
+  }
+
+  let response: string;
+  if (respMatch?.[1]) {
+    response = respMatch[1].trim();
+  } else {
+    // Fallback: strip <diagnosis> block and any XML tags, use remaining text
+    response = cleaned
+      .replace(/<diagnosis>[\s\S]*?<\/diagnosis>/gi, '')
+      .replace(/<\/?diagnosis>/gi, '')
+      .replace(/<\/?response>/gi, '')
+      .trim();
+    if (!response) response = cleaned; // last resort
+  }
+
+  return { diagnosis, response };
+}
+
+// ============================================================
+// Student model update
+// ============================================================
+
+export function updateStudentModel(model: StudentModel, diagnosis: DiagnosisEntry): StudentModel {
+  const MAX_DIAGNOSES = 20;
+  const updated = { ...model };
+
+  // 1. Append diagnosis
+  updated.recentDiagnoses = [...(model.recentDiagnoses ?? []), diagnosis].slice(-MAX_DIAGNOSES);
+  updated.updatedAt = Date.now();
+
+  // 2. Update concept mastery
+  if (diagnosis.conceptInvolved) {
+    const concept = diagnosis.conceptInvolved;
+    const current = updated.conceptMastery[concept] ?? 50; // start at 50 (neutral)
+    const deltas: Record<string, number> = {
+      solid: 5,
+      partial: 2,
+      confused: -10,
+      guessing: -5,
+    };
+    const delta = deltas[diagnosis.understanding] ?? 0;
+    updated.conceptMastery = {
+      ...updated.conceptMastery,
+      [concept]: Math.max(0, Math.min(100, current + delta)),
+    };
+  }
+
+  // 3. Track weak areas
+  if (diagnosis.gap && diagnosis.understanding !== 'solid') {
+    const areas = [...(model.weakAreas ?? [])];
+    if (!areas.includes(diagnosis.gap)) {
+      areas.push(diagnosis.gap);
+      updated.weakAreas = areas.slice(-10);
+    }
+  }
+
+  // 4. Track common mistakes
+  if (diagnosis.understanding === 'confused' && diagnosis.gap) {
+    const mistakes = [...(model.commonMistakes ?? [])];
+    if (!mistakes.includes(diagnosis.gap)) {
+      mistakes.push(diagnosis.gap);
+      updated.commonMistakes = mistakes.slice(-10);
+    }
+  }
+
+  // 5. Learning style detection (simple heuristic)
+  const solidCount = updated.recentDiagnoses.filter(d => d.understanding === 'solid').length;
+  const confusedCount = updated.recentDiagnoses.filter(d => d.understanding === 'confused').length;
+  if (updated.recentDiagnoses.length >= 5) {
+    if (confusedCount >= 3) {
+      updated.learningStyle = '可能需要更基础的铺垫，建议从具体例子入手';
+    } else if (solidCount >= 4) {
+      updated.learningStyle = '基础扎实，可以适当推进更深层的内容';
+    } else {
+      updated.learningStyle = '在正确方向上但需要更多练习巩固';
+    }
+  }
+
+  return updated;
+}
 
 // ============================================================
 // Chat API calls
@@ -63,7 +163,6 @@ const callGeminiChat = async (payload: ChatApiCall, model = 'gemini-2.5-flash'):
   if (!response.ok) {
     throw new Error(data?.error || `Gemini request failed with HTTP ${response.status}`);
   }
-
   const content = data?.content;
   if (!content) throw new Error('No response from Gemini');
   return content;
@@ -84,7 +183,6 @@ const callDeepSeekChat = async (payload: ChatApiCall): Promise<string> => {
   if (!response.ok) {
     throw new Error(data?.error || `DeepSeek request failed with HTTP ${response.status}`);
   }
-
   const content = data?.content;
   if (!content) throw new Error('No response from DeepSeek');
   return content;
@@ -99,83 +197,34 @@ export async function sendChatMessage(
   character: Character,
   userMessage: string,
   settings: GameSettings,
-): Promise<string> {
-  const systemPrompt = buildCharacterSystemPrompt(character, settings, session.pdfText);
+): Promise<{ diagnosis: DiagnosisEntry | null; response: string }> {
+  const systemPrompt = buildCharacterSystemPrompt(
+    character,
+    settings,
+    session.pdfText,
+    session.studentModel,
+  );
 
   const recentMessages = session.messages.slice(-10);
   const history = recentMessages.map(m => ({
-    role: m.role === 'user' ? 'user' : 'assistant' as const,
+    role: m.role === 'user' ? 'user' : ('assistant' as const),
     text: m.text,
   }));
 
   const payload: ChatApiCall = { systemPrompt, history, newMessage: userMessage };
 
-  if (settings.aiProvider === 'deepseek') {
-    return await callDeepSeekChat(payload);
-  }
-  return await callGeminiChat(payload);
+  const raw =
+    settings.aiProvider === 'deepseek'
+      ? await callDeepSeekChat(payload)
+      : await callGeminiChat(payload);
+
+  return parseAIResponse(raw);
 }
 
-export async function extractSubjectOutline(
-  pdfText: string,
-  settings: GameSettings,
-): Promise<{ title: string; outline: string; prerequisites: string[]; difficulty: string } | null> {
-  const prompt = buildSubjectOutlinePrompt(pdfText, settings);
-
-  try {
-    let content: string;
-    if (settings.aiProvider === 'deepseek') {
-      const response = await fetchWithRetry('/api/deepseek/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, pdfText: '' }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(data?.error || 'DeepSeek outline failed');
-      content = data?.content || '';
-    } else {
-      const response = await fetchWithRetry('/api/gemini/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          model: 'gemini-2.5-flash',
-          responseSchema: subjectOutlineSchema,
-        }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(data?.error || 'Gemini outline failed');
-      content = data?.content || '';
-    }
-
-    return parseJsonResponse<{ title: string; outline: string; prerequisites: string[]; difficulty: string }>(content);
-  } catch (error) {
-    console.error('Failed to extract subject outline:', error);
-    return null; // Non-fatal — chat can proceed without outline
-  }
-}
-
+// ============================================================
 // @deprecated
-import { AnswerFeedback } from '../types';
+// ============================================================
 
-export async function analyzeTextbook(
-  _file: File,
-  _settings: GameSettings,
-  _onProgress?: (message: string) => void,
-): Promise<{ title: string; script: any[] }> {
-  throw new Error(
-    'analyzeTextbook() has been deprecated. Use sendChatMessage() for real-time chat learning.',
-  );
-}
-
-export async function evaluateStudentAnswer(
-  _line: any, _answer: string, _context: any[], _settings: GameSettings,
-): Promise<AnswerFeedback> {
-  // In real-time chat mode, evaluation is done naturally by the character in conversation.
-  // Return a generic fallback so the UI doesn't crash if this is somehow called.
-  return {
-    score: 0,
-    verdict: 'partial' as const,
-    feedback: 'Evaluation is now handled naturally in conversation.',
-  };
+export async function extractSubjectOutline(_pdfText: string, _settings: GameSettings) {
+  return null;
 }

@@ -70,14 +70,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ currentSettings,
           <SettingGroup title={zh ? '选择导师' : 'Choose Tutor'} icon="fa-user-graduate">
             <div className="col-span-3 space-y-3">
               {builtinCharacters.map(char => {
-                const isSelected = (settings.activeCharacterId ?? 'prof-lin') === char.id;
+                const isSelected = (settings.activeCharacterId ?? 'yuki-kuudere') === char.id;
                 const borderColorMap: Record<string, string> = {
-                  blue: 'border-blue-400 bg-blue-50',
-                  emerald: 'border-emerald-400 bg-emerald-50',
+                  sky: 'border-sky-400 bg-sky-50',
+                  rose: 'border-rose-400 bg-rose-50',
+                  violet: 'border-violet-400 bg-violet-50',
+                  pink: 'border-pink-400 bg-pink-50',
                   purple: 'border-purple-400 bg-purple-50',
                   amber: 'border-amber-400 bg-amber-50',
-                  orange: 'border-orange-400 bg-orange-50',
-                  rose: 'border-rose-400 bg-rose-50',
                   indigo: 'border-indigo-400 bg-indigo-50',
                 };
                 const borderClass = isSelected

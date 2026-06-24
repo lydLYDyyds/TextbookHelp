@@ -33,22 +33,50 @@ export interface Character {
 // Real-time chat types
 // ============================================================
 
+/** Per-turn diagnostic analysis — extracted from AI's internal thinking */
+export interface DiagnosisEntry {
+  timestamp: number;
+  understanding: 'solid' | 'partial' | 'confused' | 'guessing';
+  gap: string;            // what the student is missing or confusing
+  action: 'deepen' | 're_explain' | 'advance' | 'test';
+  conceptInvolved: string;
+}
+
+/** Accumulated student model, built from diagnosis history */
+export interface StudentModel {
+  conceptMastery: Record<string, number>;   // concept → 0-100 score
+  weakAreas: string[];                       // persistent gaps
+  learningStyle: string;                     // summary of learning patterns
+  commonMistakes: string[];                  // recurring error patterns
+  recentDiagnoses: DiagnosisEntry[];         // last 20 entries
+  updatedAt: number;
+}
+
+export const EMPTY_STUDENT_MODEL: StudentModel = {
+  conceptMastery: {},
+  weakAreas: [],
+  learningStyle: '',
+  commonMistakes: [],
+  recentDiagnoses: [],
+  updatedAt: 0,
+};
+
 export interface ChatMessage {
   id: string;
   role: 'character' | 'user' | 'system';
   text: string;
   timestamp: number;
-  /** AI can tag messages to trigger special UI treatment */
   interactType?: 'question' | 'feynman' | 'summary';
 }
 
 export interface ChatSession {
   id: string;
   characterId: string;
-  sourceKey: string;         // PDF identifier (name::size::lastModified)
+  sourceKey: string;         // PDF identifier (name::size::lastModified), empty if no PDF
   title: string;
-  pdfText: string;           // extracted PDF content (truncated)
+  pdfText?: string;          // extracted PDF content (optional — can learn without PDF)
   messages: ChatMessage[];
+  studentModel?: StudentModel;
   createdAt: number;
   updatedAt: number;
 }

@@ -2,7 +2,7 @@
  * App.tsx — Application root
  *
  * State machine: TITLE → UPLOAD → CHAT
- * Side routes: SETTINGS, RESOURCES, PERSONALITY_DISTILL
+ * Side routes: SETTINGS, RESOURCES, PERSONALITY_DISTILL, HISTORY
  *
  * The app converts uploaded PDF textbooks into interactive chat-based
  * learning sessions with AI-powered character tutors.
@@ -12,6 +12,7 @@ import { TitleScreen } from './components/TitleScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { PersonalityDistillScreen } from './components/PersonalityDistillScreen';
 import { ChatSessionScreen } from './components/ChatSessionScreen';
+import { LearningHistoryScreen } from './components/LearningHistoryScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ResourceLibraryScreen } from './components/ResourceLibraryScreen';
 import { ChatSession, GameSettings } from './types';
@@ -28,10 +29,12 @@ export enum AppState {
   SETTINGS,
   RESOURCES,
   PERSONALITY_DISTILL,
+  HISTORY,
 }
 
 const App: React.FC = () => {
   const [currentState, setCurrentState] = useState<AppState>(AppState.TITLE);
+  const [skipPDF, setSkipPDF] = useState(false);
   const defaultSettings = useMemo<GameSettings>(() => ({
     detailLevel: 'detailed',
     personality: 'gentle',
@@ -39,7 +42,7 @@ const App: React.FC = () => {
     aiProvider: 'gemini',
     uiLanguage: 'zh',
     dialogueLanguage: 'zh',
-    activeCharacterId: 'prof-lin', // default to 林教授
+    activeCharacterId: 'yuki-kuudere', // default 雪乃
   }), []);
   const [settings, setSettings] = useState<GameSettings>(() => loadSettings(defaultSettings));
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
@@ -59,11 +62,6 @@ const App: React.FC = () => {
     setHasSavedSession(true);
   };
 
-  const handleResume = () => {
-    const latest = getLatestChatSession();
-    if (latest) openSession(latest);
-  };
-
   const handleBackToTitle = () => {
     setCurrentState(AppState.TITLE);
   };
@@ -71,7 +69,7 @@ const App: React.FC = () => {
   return (
     <div className="w-screen h-screen relative overflow-hidden font-serif select-none">
       <div className="absolute inset-0 z-0">
-        {currentState === AppState.CHAT ? (
+        {currentState === AppState.CHAT || currentState === AppState.HISTORY ? (
           <div className="w-full h-full bg-gradient-to-br from-slate-50 via-blue-50 to-pink-50" />
         ) : (
           <div className="w-full h-full bg-pink-50 relative overflow-hidden">
@@ -93,11 +91,21 @@ const App: React.FC = () => {
       <div className="relative z-10 w-full h-full">
         {currentState === AppState.TITLE && (
           <TitleScreen
-            onStart={() => setCurrentState(AppState.UPLOAD)}
-            onResume={handleResume}
+            onStart={() => { setSkipPDF(false); setCurrentState(AppState.UPLOAD); }}
+            onDirectStart={() => { setSkipPDF(true); setCurrentState(AppState.UPLOAD); }}
+            onHistory={() => setCurrentState(AppState.HISTORY)}
             hasSavedSession={hasSavedSession}
             onResources={() => setCurrentState(AppState.RESOURCES)}
             onSettings={() => setCurrentState(AppState.SETTINGS)}
+            language={settings.uiLanguage}
+          />
+        )}
+
+        {currentState === AppState.HISTORY && (
+          <LearningHistoryScreen
+            onResume={openSession}
+            onBack={handleBackToTitle}
+            settings={settings}
             language={settings.uiLanguage}
           />
         )}
@@ -146,6 +154,7 @@ const App: React.FC = () => {
             onSessionCreated={handleSessionCreated}
             onBack={handleBackToTitle}
             settings={settings}
+            skipPDF={skipPDF}
           />
         )}
 
@@ -158,7 +167,6 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* Fallback if CHAT state without session */}
         {currentState === AppState.CHAT && !activeSession && (
           <div className="flex items-center justify-center h-full">
             <div className="text-gray-400 text-lg">

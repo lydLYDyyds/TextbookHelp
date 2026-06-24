@@ -76,13 +76,18 @@ export const upsertChatSession = (session: ChatSession) => {
   saveChatSessions(next);
 };
 
+export const deleteChatSession = (sessionId: string) => {
+  const sessions = loadChatSessions();
+  saveChatSessions(sessions.filter(s => s.id !== sessionId));
+};
+
 const generateId = () => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const createChatSession = (params: {
   sourceKey: string;
   characterId: string;
   title: string;
-  pdfText: string;
+  pdfText?: string;
 }): ChatSession => {
   const now = Date.now();
 
@@ -92,7 +97,15 @@ export const createChatSession = (params: {
     sourceKey: params.sourceKey,
     title: params.title,
     pdfText: params.pdfText,
-    messages: [], // Start empty; greeting is generated on first exchange
+    messages: [],
+    studentModel: {
+      conceptMastery: {},
+      weakAreas: [],
+      learningStyle: '',
+      commonMistakes: [],
+      recentDiagnoses: [],
+      updatedAt: 0,
+    },
     createdAt: now,
     updatedAt: now,
   };
