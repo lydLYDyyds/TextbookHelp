@@ -32,8 +32,14 @@ const fetchWithRetry = async (url: string, options: RequestInit, retries = 2): P
 // ============================================================
 
 export function parseAIResponse(raw: string): { diagnosis: DiagnosisEntry | null; response: string } {
-  const diagMatch = raw.match(/<diagnosis>\s*([\s\S]*?)\s*<\/diagnosis>/i);
-  const respMatch = raw.match(/<response>\s*([\s\S]*?)\s*<\/response>/i);
+  // Strip markdown code fences if present
+  let cleaned = raw
+    .replace(/^```[a-z]*\s*\n?/i, '')
+    .replace(/\n?\s*```$/i, '')
+    .trim();
+
+  const diagMatch = cleaned.match(/<diagnosis>\s*([\s\S]*?)\s*<\/diagnosis>/i);
+  const respMatch = cleaned.match(/<response>\s*([\s\S]*?)\s*<\/response>/i);
 
   let diagnosis: DiagnosisEntry | null = null;
   if (diagMatch?.[1]) {
@@ -52,7 +58,18 @@ export function parseAIResponse(raw: string): { diagnosis: DiagnosisEntry | null
     };
   }
 
-  const response = respMatch?.[1]?.trim() ?? raw;
+  let response: string;
+  if (respMatch?.[1]) {
+    response = respMatch[1].trim();
+  } else {
+    // Fallback: strip <diagnosis> block and any XML tags, use remaining text
+    response = cleaned
+      .replace(/<diagnosis>[\s\S]*?<\/diagnosis>/gi, '')
+      .replace(/<\/?diagnosis>/gi, '')
+      .replace(/<\/?response>/gi, '')
+      .trim();
+    if (!response) response = cleaned; // last resort
+  }
 
   return { diagnosis, response };
 }
