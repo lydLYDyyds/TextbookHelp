@@ -3,14 +3,14 @@ import React from 'react';
 interface TitleScreenProps {
   onStart: () => void;
   onDirectStart: () => void;
-  onResume: () => void;
+  onHistory: () => void;
   hasSavedSession: boolean;
   onResources: () => void;
   onSettings: () => void;
   language: 'zh' | 'en';
 }
 
-export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onDirectStart, onResume, hasSavedSession, onResources, onSettings, language }) => {
+export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onDirectStart, onHistory, hasSavedSession, onResources, onSettings, language }) => {
   const zh = language === 'zh';
 
   return (
@@ -31,7 +31,13 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onDirectStart
         <div className="grid grid-cols-1 md:grid-cols-5 gap-5 md:gap-5">
           <MenuButton onClick={onStart} icon="fa-file-pdf" label={zh ? '导入 PDF' : 'Import PDF'} subLabel="UPLOAD" primary />
           <MenuButton onClick={onDirectStart} icon="fa-comments" label={zh ? '直接开始' : 'Direct'} subLabel="NO PDF" />
-          <MenuButton onClick={onResume} icon="fa-bookmark" label={zh ? '继续学习' : 'Resume'} subLabel="SAVED" disabled={!hasSavedSession} />
+          <MenuButton
+            onClick={onHistory}
+            icon="fa-history"
+            label={zh ? '学习记录' : 'History'}
+            subLabel={hasSavedSession ? 'SAVED' : 'EMPTY'}
+            disabled={false}
+          />
           <MenuButton onClick={onResources} icon="fa-book-atlas" label={zh ? '高阶资源' : 'Resources'} subLabel="ROADMAP" />
           <MenuButton onClick={onSettings} icon="fa-cog" label={zh ? '学习设置' : 'Settings'} subLabel="CONFIG" />
         </div>

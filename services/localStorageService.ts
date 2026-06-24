@@ -76,6 +76,11 @@ export const upsertChatSession = (session: ChatSession) => {
   saveChatSessions(next);
 };
 
+export const deleteChatSession = (sessionId: string) => {
+  const sessions = loadChatSessions();
+  saveChatSessions(sessions.filter(s => s.id !== sessionId));
+};
+
 const generateId = () => `cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const createChatSession = (params: {
